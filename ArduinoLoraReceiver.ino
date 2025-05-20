@@ -8,7 +8,6 @@ this project needs modifying to do only one thing; listen for incoming LoRaWan p
 #include <string.h>
 #include <stdio.h>
 #include "lora.h"
-#include "userComms.h"
 
 /**********************                         
 SETUP   

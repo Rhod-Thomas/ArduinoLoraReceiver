@@ -17,14 +17,8 @@
 #define TEST_MODE_RESPONSE "+MODE: TEST" 
 #define TEST_CONFIG "AT+TEST=RFCFG,868,SF7,125,8,8,14,OFF,OFF,OFF\r\n"
 #define TEST_CONFIG_RESPONSE "+TEST: RFCFG"
-#define TEST_TRANSMIT_START "AT+TEST=TXLRSTR"
-#define TEST_TRANSMIT "AT+TEST=TXLRSTR,\"Testing, Testing ....\"\r\n"
-#define TEST_TRANSMIT_RESPONSE_START "+TEST: TXLRSTR"
-#define TEST_TRANSMIT_DONE "+TEST: TX DONE"
-#define TEST_DELAY_TRANSMIT "AT+TEST=TXLRSTR,\"Delay test\"\r\n"
-#define LOW_POWER "AT+LOWPOWER\r\n"
-#define LOW_POWER_RESPONSE "+LOWPOWER: SLEEP"
-#define LOW_POWER_WAKEUP_RESPONSE "+LOWPOWER: WAKEUP"
+#define TEST_RX_START "AT+TEST=RXLRPKT\r\n"
+#define TEST_RX_START_RESPONSE "+TEST: RXLRPKT"
 
 //state machine to handle the transmit sequence.
 typedef enum  
@@ -37,12 +31,9 @@ typedef enum
   testModeEnableRsp,
   testModeConfig,
   testModeConfigRsp,
-  testTransmit,
-  testTransmitRsp,
-  initTestTransmitSuccess,
-  waitTestTransmitSuccess,
-  lowPowerMode,
-  lowPowerModeRsp,
+  testReceive,
+  testReceiveRsp,
+  testReceiveWait,
   cleanUp,
 
 }txSeqStg;
@@ -194,7 +185,9 @@ void processCmdRsp(rspStat rsp, txSeqStg next, txSeqStg prev)
 
 void LoRaInit()
 {
-  CurrentTxStage = idle;
+  CurrentTxStage = atSend;
+  DebugFlag = true;
+  Retries = 3;
   altSerial.begin(9600);
 }
 
@@ -240,58 +233,34 @@ bool LoRaService()
     case testModeConfigRsp:
 
       rspStatus= atRespServ();
-      processCmdRsp(rspStatus, testTransmit, testModeConfig);
+      processCmdRsp(rspStatus, testReceive, testModeConfig);
 
     break;
-    case testTransmit:
+    case testReceive:
 
-      //TODO 
-      //build transmit packet here
-      char message [PACKET_MAX_LENGTH];
-      strcpy(message, TEST_TRANSMIT_START);
-      strcat(message, ",\"");
-      strcat(message, Packet);
-      strcat(message, "\"\r\n");
-    
-      atSendCommand(message, TEST_TRANSMIT_RESPONSE_START);
-      CurrentTxStage = testTransmitRsp;
+      atSendCommand(TEST_RX_START, TEST_RX_START_RESPONSE);
+      CurrentTxStage = testReceiveRsp;
 
     break;
-    case testTransmitRsp:
+    case testReceiveRsp:
 
       rspStatus= atRespServ();
-      processCmdRsp(rspStatus, initTestTransmitSuccess, testTransmit);
+      processCmdRsp(rspStatus, testReceiveWait, testReceive);
 
     break;
-    case initTestTransmitSuccess:
-      //initialise for next response.
+    case testReceiveWait:
+     
+      //pass through incoming data to serial.
+      while(altSerial.available())
+      {
+         char nextChar = altSerial.read();
+	 Serial.print(nextChar);
+      }
       
-      ResponseLength = strlen(TEST_TRANSMIT_DONE);
-      strcpy(RespCopy, TEST_TRANSMIT_DONE);
-      Retries = AT_RETRIES;
-      Timeout = TX_TIMEOUT_MS;
-      prepareResponseStuff();
-      CurrentTxStage = waitTestTransmitSuccess;
-
-    break;
-    case waitTestTransmitSuccess:
-
-      rspStatus= atRespServ();
-      processCmdRsp(rspStatus, lowPowerMode, testTransmit);
-
-    break;
-    case lowPowerMode:
-
-      atSendCommand(LOW_POWER, LOW_POWER_RESPONSE);
-      CurrentTxStage = lowPowerModeRsp;
-
-    break;
-    case lowPowerModeRsp:
-
-      rspStatus= atRespServ();
-      processCmdRsp(rspStatus, cleanUp, lowPowerMode);
-
-    break;
+      //TODO
+      //TEST WHETHER THID CAN BE LEFT ON INDEFINITELY
+      //OR WE NEED TO HANDLE ON A PER PAVKET BASIS.
+    break; 
     case cleanUp:
 
       CurrentTxStage = idle;
