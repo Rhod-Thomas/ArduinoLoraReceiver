@@ -8,6 +8,7 @@ this project needs modifying to do only one thing; listen for incoming LoRaWan p
 #include <string.h>
 #include <stdio.h>
 #include "lora.h"
+#include <avr/wdt.h>
 
 /**********************                         
 SETUP   
@@ -22,6 +23,10 @@ void setup() {
   //UserCommsInit();  
 
   LoRaInit();
+
+  wdt_disable();
+  delay(3000);
+  wdt_enable(WDTO_8S);
 }
 
 /**********************  
@@ -32,5 +37,6 @@ void loop() {
   
   //UserCommsService();
   LoRaService();
+  wdt_reset();
 
 }

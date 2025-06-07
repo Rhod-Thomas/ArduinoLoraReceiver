@@ -249,7 +249,13 @@ bool LoRaService()
 
     break;
     case testReceiveWait:
-     
+    
+      //TODO   
+      //need a way to check that the module is still working...
+      //AT command maybe?
+      //AT+TEST?
+      //
+
       //pass through incoming data to serial.
       while(altSerial.available())
       {
@@ -257,9 +263,6 @@ bool LoRaService()
 	 Serial.print(nextChar);
       }
       
-      //TODO
-      //TEST WHETHER THID CAN BE LEFT ON INDEFINITELY
-      //OR WE NEED TO HANDLE ON A PER PAVKET BASIS.
     break; 
     case cleanUp:
 
