@@ -10,6 +10,9 @@
 #define RESPONSE_MAX_LENGTH 20
 #define NEWLINE '\n'
 
+//inactive timeout is ninety minutes
+#define INACTIVE_TIMEOUT (unsigned long)1000 * 60 * 90
+
 //LoRa grove E5 AT COMMANDS
 #define AT "AT\r\n"
 #define AT_RESPONSE "+AT: OK"
@@ -19,6 +22,10 @@
 #define TEST_CONFIG_RESPONSE "+TEST: RFCFG"
 #define TEST_RX_START "AT+TEST=RXLRPKT\r\n"
 #define TEST_RX_START_RESPONSE "+TEST: RXLRPKT"
+#define TEST_STOP "AT+TEST=STOP\r\n"
+#define TEST_STOP_RSP "+TEST: STOP"
+#define RESET "AT+RESET\r\n"
+#define RESET_RSP "+RESET: OK"
 
 //state machine to handle the transmit sequence.
 typedef enum  
@@ -34,6 +41,10 @@ typedef enum
   testReceive,
   testReceiveRsp,
   testReceiveWait,
+  testStop,
+  testStopRsp,
+  reset,
+  resetRsp,
   cleanUp,
 
 }txSeqStg;
@@ -199,6 +210,10 @@ bool LoRaService()
   {
     case idle:
       //do nothing
+      //this code shoukd never be idle
+      //lock into an infinite loop to cause the watchdog to trigger
+      while(true);
+
     break;
     case atSend:
       
@@ -261,9 +276,39 @@ bool LoRaService()
       {
          char nextChar = altSerial.read();
 	 Serial.print(nextChar);
+	 StartTime = millis();
+      }
+
+      if((millis() - StartTime) > INACTIVE_TIMEOUT)
+      {
+        CurrentTxStage = testStop;
       }
       
     break; 
+    case testStop:
+
+      atSendCommand(TEST_STOP, TEST_STOP_RSP);
+      CurrentTxStage = testStopRsp;
+
+    break;
+    case testStopRsp:
+
+      rspStatus= atRespServ();
+      processCmdRsp(rspStatus, reset, testStop);
+
+    break;
+    case reset:
+
+      atSendCommand(RESET, RESET_RSP);
+      CurrentTxStage = resetRsp;
+
+    break;
+    case resetRsp:
+
+      rspStatus= atRespServ();
+      processCmdRsp(rspStatus, atSend, reset);
+
+    break;
     case cleanUp:
 
       CurrentTxStage = idle;
